@@ -3,6 +3,8 @@ package tensority
 import (
 	"reflect"
 	"unsafe"
+	"sync"
+	"runtime"
 
 	"gonum.org/v1/gonum/mat"
 	"github.com/bytom/crypto/sha3pool"
@@ -37,40 +39,61 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 	tmp := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
 
-
 	dataIdentity := make([]float64, matSize*matSize)
 	for i := 0; i < 256; i++ {
 		dataIdentity[i*257] = float64(1)
 	}
 
-	for i := 0; i < 4; i++ {
-		ma := mat.NewDense(matSize, matSize, dataIdentity)
-		mc := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+	maArr := make([]float64, 4*matSize*matSize)
 
-		var sequence [32]byte
-		sha3pool.Sum256(sequence[:], headerhash[i*8:(i+1)*8])
+	runtime.GOMAXPROCS(4)
+	var wg sync.WaitGroup
+	wg.Add(4)
 
-		for j := 0; j < 2; j++ {
-			for k := 0; k < 32; k++ {
-				index := int(sequence[k])
-				mb := mat.NewDense(matSize, matSize, f64data[index*matSize*matSize:(index+1)*matSize*matSize])
-				mc.Mul(ma, mb.T())
-				for row := 0; row < matSize; row++ {
-					for col := 0; col < matSize; col++ {
-						i32v := int32(mc.At(row, col))
-						i8v := int8((i32v & 0xff) +
-							((i32v >> 8) & 0xff))
-						mc.Set(row, col, float64(i8v))
-					}
-				}
-				ma = mc
+	for k := 0; k < 4; k++ {
+		go func(i int) {
+			if i >= 4 {
+				return
 			}
-		}
+			defer wg.Done()
 
+			ma := mat.NewDense(matSize, matSize, dataIdentity)
+			mc := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+
+			var sequence [32]byte
+			sha3pool.Sum256(sequence[:], headerhash[i*8:(i+1)*8])
+
+			for j := 0; j < 2; j++ {
+				for k := 0; k < 32; k++ {
+					index := int(sequence[k])
+					mb := mat.NewDense(matSize, matSize, f64data[index*matSize*matSize:(index+1)*matSize*matSize])
+					mc.Mul(ma, mb.T())
+					for row := 0; row < matSize; row++ {
+						for col := 0; col < matSize; col++ {
+							i32v := int32(mc.At(row, col))
+							i8v := int8((i32v & 0xff) +
+								((i32v >> 8) & 0xff))
+							mc.Set(row, col, float64(i8v))
+						}
+					}
+					ma = mc
+				}
+			}
+
+			for row := 0; row < matSize; row++ {
+				for col := 0; col < matSize; col++ {
+					maArr[i*matSize*matSize+row*matSize+col] = ma.At(row, col)
+				}
+			}
+		}(k)
+	}
+	wg.Wait()
+
+	for i := 0; i < 4; i++ {
 		for row := 0; row < matSize; row++ {
 			for col := 0; col < matSize; col++ {
 				i32vtmp := int32(tmp.At(row, col))
-				i32vma := int32(ma.At(row, col))
+				i32vma := int32(maArr[i*matSize*matSize+row*matSize+col])
 				i8v := int8(int32(i32vtmp+i32vma) & 0xff)
 				tmp.Set(row, col, float64(i8v))
 			}
@@ -85,6 +108,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	}
 
 	return result
+
 }
 
 // hashMatrix hash result of mulMatrix
