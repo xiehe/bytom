@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	//"gonum.org/v1/gonum/mat"
+	"github.com/mumax/3/cuda"
 	"github.com/bytom/crypto/sha3pool"
 	"github.com/bytom/protocol/bc"
 	"sync"
@@ -77,12 +78,22 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 						go func(row int, col int) {
 							defer wg.Done()
 
-							var dotProduct float64
-							for x:= 0; x < matSize; x++ {
-								dotProduct += ma[row*matSize+x]*mb[col*matSize+x]
-							}
+							//var dotProduct float64
+							//for x:= 0; x < matSize; x++ {
+							//	dotProduct += ma[row*matSize+x]*mb[col*matSize+x]
+							//}
 
-							mc[row*matSize+col] = dotProduct
+
+							//a := cuda.NewSlice(N)
+							//b := cuda.NewSlice(N)
+							//c := cuda.NewSlice(N)
+							//defer a.Free()
+							//defer b.Free()
+							//defer c.Free()
+							//a.CopyHtoD([]float32{0, -1, -2})
+							//b.CopyHtoD([]float32{0, 1, 4})
+
+							mc[row*matSize+col] = cuda.Dot(ma[row*matSize:row*matSize+matSize], mb[col*matSize:col*matSize+matSize])
 						} (row, col)
 					}
 				}
