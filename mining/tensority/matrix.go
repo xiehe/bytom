@@ -40,6 +40,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	}
 
 	tmp := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+
 	//var	tmp [matSize][matSize]float64
 	//var ma [4][matSize][matSize]float64
 
@@ -58,7 +59,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 	for k := 0; k < 4; k++ {
 		go func(i int) {
-			if(i >= 4) {
+			if i >= 4 {
 				return
 			}
 			defer wg.Done()
@@ -88,11 +89,12 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 			for row := 0; row < matSize; row++ {
 				for col := 0; col < matSize; col++ {
-					maArr[i*matSize*matSize+row*matSize+col] = ma.At(row,col)
+					maArr[i*matSize*matSize+row*matSize+col] = ma.At(row, col)
 				}
 			}
 		}(k)
 	}
+	wg.Wait()
 
 	for i := 0; i < 4; i++ {
 		for row := 0; row < matSize; row++ {
@@ -117,6 +119,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	}
 
 	return result
+
 }
 
 // hashMatrix hash result of mulMatrix
