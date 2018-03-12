@@ -35,14 +35,14 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	i8data := *(*[]int8)(unsafe.Pointer(&header))
 
 	f64data := make([]float64, matNum*matSize*matSize)
+	//var f64data [matNum*matSize*matSize]float64
 	for i := 0; i < matNum*matSize*matSize; i++ {
 		f64data[i] = float64(i8data[i])
 	}
 
-	tmp := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
-
-	//var	tmp [matSize][matSize]float64
-	//var ma [4][matSize][matSize]float64
+	//tmp := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+	var	tmp [matSize][matSize]float64
+	var maArr [4][matSize][matSize]float64
 
 	dataIdentity := make([]float64, matSize*matSize)
 	for i := 0; i < 256; i++ {
@@ -51,7 +51,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 	start := time.Now()
 
-	maArr := make([]float64, 4*matSize*matSize)
+	//maArr := make([]float64, 4*matSize*matSize)
 
 	runtime.GOMAXPROCS(4)
 	var wg sync.WaitGroup
@@ -64,8 +64,11 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 			}
 			defer wg.Done()
 
-			ma := mat.NewDense(matSize, matSize, dataIdentity)
-			mc := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+			//ma := mat.NewDense(matSize, matSize, dataIdentity)
+			//mc := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
+
+			var ma [matSize][matSize]float64
+			var mc [matSize][matSize]float64
 
 			var sequence [32]byte
 			sha3pool.Sum256(sequence[:], headerhash[i*8:(i+1)*8])
@@ -73,14 +76,23 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 			for j := 0; j < 2; j++ {
 				for k := 0; k < 32; k++ {
 					index := int(sequence[k])
+					//mb := [matSize][matSize]float64(f64data[index*matSize*matSize:(index+1)*matSize*matSize]))
 					mb := mat.NewDense(matSize, matSize, f64data[index*matSize*matSize:(index+1)*matSize*matSize])
-					mc.Mul(ma, mb.T())
+					//mc.Mul(ma, mb.T())
+
+
 					for row := 0; row < matSize; row++ {
 						for col := 0; col < matSize; col++ {
-							i32v := int32(mc.At(row, col))
+							mc[row][col] = ma[row][col]*mb.At(col,row)
+						}
+					}
+
+					for row := 0; row < matSize; row++ {
+						for col := 0; col < matSize; col++ {
+							i32v := int32(mc[row][col])
 							i8v := int8((i32v & 0xff) +
 								((i32v >> 8) & 0xff))
-							mc.Set(row, col, float64(i8v))
+							mc[row][col] = float64(i8v)
 						}
 					}
 					ma = mc
@@ -89,7 +101,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 			for row := 0; row < matSize; row++ {
 				for col := 0; col < matSize; col++ {
-					maArr[i*matSize*matSize+row*matSize+col] = ma.At(row, col)
+					maArr[i][row][col] = ma[row][col]
 				}
 			}
 		}(k)
@@ -99,10 +111,10 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	for i := 0; i < 4; i++ {
 		for row := 0; row < matSize; row++ {
 			for col := 0; col < matSize; col++ {
-				i32vtmp := int32(tmp.At(row, col))
-				i32vma := int32(maArr[i*matSize*matSize+row*matSize+col])
+				i32vtmp := int32(tmp[row][col])
+				i32vma := int32(maArr[i][row][col])
 				i8v := int8(int32(i32vtmp+i32vma) & 0xff)
-				tmp.Set(row, col, float64(i8v))
+				tmp[row][col] = float64(i8v)
 			}
 		}
 	}
@@ -114,7 +126,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	result := make([]uint8, 0)
 	for i := 0; i < matSize; i++ {
 		for j := 0; j < matSize; j++ {
-			result = append(result, uint8(tmp.At(i, j)))
+			result = append(result, uint8(tmp[i][j]))
 		}
 	}
 
