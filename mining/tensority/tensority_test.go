@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bytom/protocol/bc"
+	"fmt"
 )
 
 // Tests that tensority hash result is correct.
@@ -116,6 +117,8 @@ func TestHash(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
+		fmt.Println("Running with test case", i+1)
+
 		bhhash := bc.NewHash(tt.blockHeader)
 		bhseed := bc.NewHash(tt.seed)
 
@@ -127,5 +130,7 @@ func TestHash(t *testing.T) {
 		if !reflect.DeepEqual(resArr, tt.hash) {
 			t.Errorf("hash %d: content mismatch: have %x, correct %x", i, resArr, tt.hash)
 		}
+
+		fmt.Println()
 	}
 }

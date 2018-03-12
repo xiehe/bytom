@@ -9,6 +9,8 @@ import (
 	"gonum.org/v1/gonum/mat"
 	"github.com/bytom/crypto/sha3pool"
 	"github.com/bytom/protocol/bc"
+	"time"
+	"fmt"
 )
 
 const (
@@ -17,6 +19,7 @@ const (
 )
 
 func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
+	sT := time.Now()
 	ui32data := make([]uint32, matNum*matSize*matSize/4)
 	for i := 0; i < 128; i++ {
 		start := i * 1024 * 32
@@ -25,7 +28,10 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 			copy(ui32data[start+512*32+j*32:start+512*32+j*32+32], cache[start+j*64+32:start+j*64+64])
 		}
 	}
+	eT := time.Now()
+	fmt.Println("\tTime for preparing ui32data in mulMatrix:", eT.Sub(sT))
 
+	sT = time.Now()
 	// Convert our destination slice to a int8 buffer
 	header := *(*reflect.SliceHeader)(unsafe.Pointer(&ui32data))
 	header.Len *= 4
@@ -36,15 +42,21 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	for i := 0; i < matNum*matSize*matSize; i++ {
 		f64data[i] = float64(i8data[i])
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for preparing f64data in mulMatrix:", eT.Sub(sT))
 
+	sT = time.Now()
 	dataIdentity := make([]float64, matSize*matSize)
 	for i := 0; i < 256; i++ {
 		dataIdentity[i*257] = float64(1)
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for preparing dataIdentity in mulMatrix:", eT.Sub(sT))
 
 	var tmp [matSize][matSize]float64
 	var maArr [4][matSize][matSize]float64
 
+	sT = time.Now()
 	runtime.GOMAXPROCS(4)
 	var wg sync.WaitGroup
 	wg.Add(4)
@@ -85,7 +97,10 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 		}(k)
 	}
 	wg.Wait()
+	eT = time.Now()
+	fmt.Println("\tTime for parallelly preparing maArr[i] in mulMatrix:", eT.Sub(sT))
 
+	sT = time.Now()
 	for i := 0; i < 4; i++ {
 		for row := 0; row < matSize; row++ {
 			for col := 0; col < matSize; col++ {
@@ -96,13 +111,18 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 			}
 		}
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for preparing tmp in mulMatrix:", eT.Sub(sT))
 
+	sT = time.Now()
 	result := make([]uint8, 0)
 	for i := 0; i < matSize; i++ {
 		for j := 0; j < matSize; j++ {
 			result = append(result, uint8(tmp[i][j]))
 		}
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for preparing result in mulMatrix:", eT.Sub(sT))
 	return result
 }
 

@@ -7,6 +7,8 @@ import (
 	"github.com/bytom/crypto/scrypt"
 	"github.com/bytom/crypto/sha3pool"
 	"github.com/bytom/protocol/bc"
+	"time"
+	"fmt"
 )
 
 func calcSeed(blockHashs []*bc.Hash) []byte {
@@ -34,18 +36,28 @@ func extendBytes(seed []byte, round int) []byte {
 }
 
 func calcSeedCache(seed []byte) (cache []uint32) {
+	sT := time.Now()
 	extSeed := extendBytes(seed, 3)
+	eT := time.Now()
+	fmt.Println("\tTime for extendBytes (mainly 3 SHA3-256 loops) in calcSeedCache:", eT.Sub(sT))
+
 	v := make([]uint32, 32*1024)
 
 	// Swap the byte order on big endian systems
+	sT = time.Now()
 	if !isLittleEndian() {
 		swap(extSeed)
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for swap in calcSeedCache:", eT.Sub(sT))
 
+	sT = time.Now()
 	for i := 0; i < 128; i++ {
 		scrypt.Smix(extSeed, v)
 		cache = append(cache, v...)
 	}
+	eT = time.Now()
+	fmt.Println("\tTime for 128 scrypt loops in calcSeedCache:", eT.Sub(sT))
 
 	return cache
 }
