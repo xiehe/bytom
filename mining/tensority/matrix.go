@@ -3,14 +3,14 @@ package tensority
 import (
 	"reflect"
 	"unsafe"
-	"sync"
+	"time"
+	"fmt"
 	"runtime"
+	"sync"
 
 	"gonum.org/v1/gonum/mat"
 	"github.com/bytom/crypto/sha3pool"
 	"github.com/bytom/protocol/bc"
-	"time"
-	"fmt"
 )
 
 const (
@@ -75,6 +75,7 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 					index := int(sequence[k])
 					mb := mat.NewDense(matSize, matSize, f64data[index*matSize*matSize:(index+1)*matSize*matSize])
 					mc.Mul(ma, mb.T())
+
 					for row := 0; row < matSize; row++ {
 						for col := 0; col < matSize; col++ {
 							i32v := int32(mc.At(row, col))
