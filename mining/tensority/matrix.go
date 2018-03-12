@@ -3,8 +3,6 @@ package tensority
 import (
 	"reflect"
 	"unsafe"
-	"time"
-	"fmt"
 	"runtime"
 	"sync"
 
@@ -39,18 +37,12 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 		f64data[i] = float64(i8data[i])
 	}
 
-	//tmp := mat.NewDense(matSize, matSize, make([]float64, matSize*matSize))
-	//tmp := make([]float64, matSize*matSize)
-	var tmp [matSize][matSize]float64
-
 	dataIdentity := make([]float64, matSize*matSize)
 	for i := 0; i < 256; i++ {
 		dataIdentity[i*257] = float64(1)
 	}
 
-	start := time.Now()
-
-	//maArr := make([]float64, 4*matSize*matSize)
+	var tmp [matSize][matSize]float64
 	var maArr [4][matSize][matSize]float64
 
 	runtime.GOMAXPROCS(4)
@@ -59,9 +51,6 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 	for k := 0; k < 4; k++ {
 		go func(i int) {
-			if i >= 4 {
-				return
-			}
 			defer wg.Done()
 
 			ma := mat.NewDense(matSize, matSize, dataIdentity)
@@ -90,7 +79,6 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 
 			for row := 0; row < matSize; row++ {
 				for col := 0; col < matSize; col++ {
-					//maArr[i*matSize*matSize+row*matSize+col] = ma.At(row, col)
 					maArr[i][row][col] = ma.At(row, col)
 				}
 			}
@@ -101,33 +89,21 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 	for i := 0; i < 4; i++ {
 		for row := 0; row < matSize; row++ {
 			for col := 0; col < matSize; col++ {
-				//i32vtmp := int32(tmp.At(row, col))
-				//i32vtmp := int32(tmp[row*matSize+col])
 				i32vtmp := int32(tmp[row][col])
-				//i32vma := int32(maArr[i*matSize*matSize+row*matSize+col])
 				i32vma := int32(maArr[i][row][col])
 				i8v := int8(int32(i32vtmp+i32vma) & 0xff)
-				//tmp.Set(row, col, float64(i8v))
-				//tmp[row*matSize+col] = float64(i8v)
 				tmp[row][col] = float64(i8v)
 			}
 		}
 	}
 
-	end := time.Now()
-	fmt.Println(end.Sub(start))
-
 	result := make([]uint8, 0)
 	for i := 0; i < matSize; i++ {
 		for j := 0; j < matSize; j++ {
-			//result = append(result, uint8(tmp.At(i, j)))
-			//result = append(result, uint8(tmp[i*matSize+j]))
 			result = append(result, uint8(tmp[i][j]))
 		}
 	}
-
 	return result
-
 }
 
 // hashMatrix hash result of mulMatrix
