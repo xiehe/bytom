@@ -84,8 +84,8 @@ func mulMatrix(headerhash []byte, cache []uint32) []uint8 {
 							//}
 
 
-							//a := cuda.NewSlice(N)
-							//b := cuda.NewSlice(N)
+							//a := cuda.NewSlice(matSize)
+							//b := cuda.NewSlice(matSize)
 							//c := cuda.NewSlice(N)
 							//defer a.Free()
 							//defer b.Free()
