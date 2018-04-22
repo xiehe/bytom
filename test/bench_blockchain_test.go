@@ -34,36 +34,36 @@ func BenchmarkChain_BtmTx_NoAsset_BASE(b *testing.B) {
 }
 
 func BenchmarkChain_5000BtmTx_NoAsset_BASE(b *testing.B) {
-	benchInsertChain(b, 5000, 0, "")
+	benchInsertChain(b, 10000, 0, "")
 }
 
 func BenchmarkChain_5000BtmTx_1Asset_BASE(b *testing.B) {
-	benchInsertChain(b, 5000, 1, "")
+	benchInsertChain(b, 10000, 10, "")
 }
 
 // standard Transaction
 func BenchmarkChain_BtmTx_NoAsset_P2PKH(b *testing.B) {
-	benchInsertChain(b, 1000, 0, "P2PKH")
+	benchInsertChain(b, 10000, 0, "P2PKH")
 }
 
 func BenchmarkChain_BtmTx_1Asset_P2PKH(b *testing.B) {
-	benchInsertChain(b, 1000, 1, "P2PKH")
+	benchInsertChain(b, 10000, 0, "P2PKH")
 }
 
 func BenchmarkChain_BtmTx_NoAsset_P2SH(b *testing.B) {
-	benchInsertChain(b, 100, 0, "P2SH")
+	benchInsertChain(b, 10000, 0, "P2SH")
 }
 
 func BenchmarkChain_BtmTx_1Asset_P2SH(b *testing.B) {
-	benchInsertChain(b, 100, 1, "P2SH")
+	benchInsertChain(b, 10000, 1, "P2SH")
 }
 
 func BenchmarkChain_BtmTx_NoAsset_MultiSign(b *testing.B) {
-	benchInsertChain(b, 100, 0, "MultiSign")
+	benchInsertChain(b, 10000, 0, "MultiSign")
 }
 
 func BenchmarkChain_BtmTx_1Asset_MultiSign(b *testing.B) {
-	benchInsertChain(b, 100, 1, "MultiSign")
+	benchInsertChain(b, 10000, 1, "MultiSign")
 }
 
 func benchInsertChain(b *testing.B, blockTxNumber int, otherAssetNum int, txType string) {

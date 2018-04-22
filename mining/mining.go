@@ -20,6 +20,7 @@ import (
 	"github.com/bytom/protocol/state"
 	"github.com/bytom/protocol/validation"
 	"github.com/bytom/protocol/vm/vmutil"
+	"fmt"
 )
 
 // createCoinbaseTx returns a coinbase transaction paying an appropriate subsidy
@@ -136,6 +137,9 @@ func NewBlockTemplate(c *protocol.Chain, txPool *protocol.TxPool, accountManager
 			break
 		}
 	}
+
+	fmt.Println("---------------block total used Gas:", gasUsed)
+	fmt.Println("---------------block total used txFee:", txFee)
 
 	// creater coinbase transaction
 	b.Transactions[0], err = createCoinbaseTx(accountManager, txFee, nextBlockHeight)

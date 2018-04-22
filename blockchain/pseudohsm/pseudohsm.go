@@ -27,7 +27,7 @@ type HSM struct {
 	cacheMu  sync.Mutex
 	keyStore keyStore
 	cache    *keyCache
-	//kdCache  map[chainkd.XPub]chainkd.XPrv
+	kdCache  map[chainkd.XPub]chainkd.XPrv
 }
 
 // XPub type for pubkey for anyone can see
@@ -43,7 +43,7 @@ func New(keypath string) (*HSM, error) {
 	return &HSM{
 		keyStore: &keyStorePassphrase{keydir, LightScryptN, LightScryptP},
 		cache:    newKeyCache(keydir),
-		//kdCache:  make(map[chainkd.XPub]chainkd.XPrv),
+		kdCache:  make(map[chainkd.XPub]chainkd.XPrv),
 	}, nil
 }
 
@@ -110,15 +110,15 @@ func (h *HSM) LoadChainKDKey(xpub chainkd.XPub, auth string) (xprv chainkd.XPrv,
 	h.cacheMu.Lock()
 	defer h.cacheMu.Unlock()
 
-	//if xprv, ok := h.kdCache[xpub]; ok {
-	//	return xprv, nil
-	//}
+	if xprv, ok := h.kdCache[xpub]; ok {
+		return xprv, nil
+	}
 
 	_, xkey, err := h.loadDecryptedKey(xpub, auth)
 	if err != nil {
 		return xprv, ErrLoadKey
 	}
-	//h.kdCache[xpb.XPub] = xkey.XPrv
+	h.kdCache[xkey.XPub] = xkey.XPrv
 	return xkey.XPrv, nil
 }
 
