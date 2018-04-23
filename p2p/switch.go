@@ -329,6 +329,12 @@ func (sw *Switch) DialSeeds(addrBook *AddrBook, seeds []string) error {
 
 		addrBook.Save()
 	}
+	//permute the list, dial them in random order.
+	perm := rand.Perm(len(netAddrs))
+	for i := 0; i < len(perm)/2; i++ {
+		j := perm[i]
+		sw.dialSeed(netAddrs[j])
+	}
 
 	return nil
 }
@@ -480,11 +486,11 @@ func (sw *Switch) StopPeerGracefully(peer *Peer) {
 }
 
 func (sw *Switch) stopAndRemovePeer(peer *Peer, reason interface{}) {
-	sw.peers.Remove(peer)
-	peer.Stop()
 	for _, reactor := range sw.reactors {
 		reactor.RemovePeer(peer, reason)
 	}
+	sw.peers.Remove(peer)
+	peer.Stop()
 }
 
 func (sw *Switch) listenerRoutine(l Listener) {
@@ -660,7 +666,9 @@ func (sw *Switch) addPeerWithConnectionAndConfig(conn net.Conn, config *PeerConf
 func (sw *Switch) AddBannedPeer(peer *Peer) error {
 	sw.mtx.Lock()
 	defer sw.mtx.Unlock()
-
+	if peer == nil {
+		return nil
+	}
 	key := peer.mconn.RemoteAddress.IP.String()
 	sw.bannedPeer[key] = time.Now().Add(defaultBanDuration)
 	datajson, err := json.Marshal(sw.bannedPeer)
