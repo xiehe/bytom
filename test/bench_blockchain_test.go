@@ -6,10 +6,12 @@ import (
 	"os"
 	"testing"
 	"time"
+	"crypto/rand"
 
 	dbm "github.com/tendermint/tmlibs/db"
 
 	"github.com/bytom/account"
+	"github.com/bytom/asset"
 	"github.com/bytom/blockchain/pseudohsm"
 	"github.com/bytom/blockchain/signers"
 	"github.com/bytom/blockchain/txbuilder"
@@ -66,6 +68,10 @@ func BenchmarkChain_BtmTx_1Asset_MultiSign(b *testing.B) {
 	benchInsertChain(b, 10000, 1, "MultiSign")
 }
 
+func BenchmarkChain_BtmTx_Asset_Issue(b *testing.B) {
+	benchInsertChain(b, 10000, 0, "Issue")
+}
+
 func benchInsertChain(b *testing.B, blockTxNumber int, otherAssetNum int, txType string) {
 	b.StopTimer()
 	testNumber := b.N
@@ -115,6 +121,11 @@ func GenerateChainData(dirPath string, testDB dbm.DB, txNumber, otherAssetNum in
 		}
 	case "MultiSign":
 		txs, err = MockTxsMultiSign(dirPath, testDB, txNumber, otherAssetNum)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	case "Issue":
+		txs, err = MockTxsIssue(dirPath, testDB, txNumber, otherAssetNum)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -312,10 +323,36 @@ func AddTxBuilder(tplBuilder *txbuilder.TemplateBuilder, utxo *account.UTXO, sig
 	return nil
 }
 
-func BuildTx(baseUtxo *account.UTXO, otherUtxos []*account.UTXO, signer *signers.Signer) (*txbuilder.Template, error) {
+func AddIssueTxBuilder(tplBuilder *txbuilder.TemplateBuilder, asset *asset.Asset, issueAmount uint64, ControlProgram []byte) error {
+	var nonce [8]byte
+	_, err := rand.Read(nonce[:])
+	if err != nil {
+		return err
+	}
+
+	assetDef := asset.RawDefinitionByte
+	txin := types.NewIssuanceInput(nonce[:], issueAmount, asset.IssuanceProgram, nil, assetDef)
+
+	tplIn := &txbuilder.SigningInstruction{}
+	path := signers.Path(asset.Signer, signers.AssetKeySpace)
+	tplIn.AddRawWitnessKeys(asset.Signer.XPubs, path, asset.Signer.Quorum)
+	tplBuilder.AddInput(txin, tplIn)
+
+	txOutput := AddTxOutput(asset.AssetID, issueAmount, ControlProgram)
+	tplBuilder.AddOutput(txOutput)
+
+	return nil
+}
+
+
+func BuildTx(baseUtxo *account.UTXO, otherUtxos []*account.UTXO, signer *signers.Signer, issueAsset *MockIssueAsset) (*txbuilder.Template, error) {
 	btmServiceFlag := false
 	if otherUtxos == nil || len(otherUtxos) == 0 {
 		btmServiceFlag = true
+	}
+
+	if issueAsset != nil {
+		btmServiceFlag = false
 	}
 
 	tplBuilder, err := CreateTxBuilder(baseUtxo, btmServiceFlag, signer)
@@ -325,6 +362,12 @@ func BuildTx(baseUtxo *account.UTXO, otherUtxos []*account.UTXO, signer *signers
 
 	for _, u := range otherUtxos {
 		if err := AddTxBuilder(tplBuilder, u, signer); err != nil {
+			return nil, err
+		}
+	}
+
+	if issueAsset != nil && otherUtxos == nil {
+		if err := AddIssueTxBuilder(tplBuilder, issueAsset.Asset, issueAsset.IssueAmount, issueAsset.ControlProgram); err != nil {
 			return nil, err
 		}
 	}
@@ -353,7 +396,7 @@ func GenetrateTxbyUtxo(baseUtxo []*account.UTXO, otherUtxo [][]*account.UTXO) ([
 			tmpUtxo = nil
 		}
 
-		tpl, err := BuildTx(baseUtxo[i], tmpUtxo, nil)
+		tpl, err := BuildTx(baseUtxo[i], tmpUtxo, nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -419,7 +462,7 @@ func MockTxsP2PKH(keyDirPath string, testDB dbm.DB, txNumber, otherAssetNum int)
 
 		utxo := MockSimpleUtxo(0, consensus.BTMAssetID, 1000000000, controlProg)
 		otherUtxos := GenerateOtherUtxos(i, otherAssetNum, 6000, controlProg)
-		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer)
+		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -466,7 +509,7 @@ func MockTxsP2SH(keyDirPath string, testDB dbm.DB, txNumber, otherAssetNum int) 
 
 		utxo := MockSimpleUtxo(0, consensus.BTMAssetID, 1000000000, controlProg)
 		otherUtxos := GenerateOtherUtxos(i, otherAssetNum, 6000, controlProg)
-		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer)
+		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -512,7 +555,7 @@ func MockTxsMultiSign(keyDirPath string, testDB dbm.DB, txNumber, otherAssetNum 
 
 		utxo := MockSimpleUtxo(0, consensus.BTMAssetID, 1000000000, controlProg)
 		otherUtxos := GenerateOtherUtxos(i, otherAssetNum, 6000, controlProg)
-		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer)
+		tpl, err := BuildTx(utxo, otherUtxos, testAccount.Signer, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -522,6 +565,67 @@ func MockTxsMultiSign(keyDirPath string, testDB dbm.DB, txNumber, otherAssetNum 
 		}
 
 		if _, err := MockSign(tpl, hsm, "password2"); err != nil {
+			return nil, err
+		}
+
+		txs = append(txs, tpl.Transaction)
+	}
+
+	return txs, nil
+}
+
+type MockIssueAsset struct{
+	Asset *asset.Asset
+	IssueAmount uint64
+	ControlProgram []byte
+}
+
+func MockTxsIssue(keyDirPath string, testDB dbm.DB, txNumber, otherAssetNum int) ([]*types.Tx, error) {
+	accountManager := account.NewManager(testDB, nil)
+	hsm, err := pseudohsm.New(keyDirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	xpub, err := hsm.XCreate("TestPub", "password")
+	if err != nil {
+		return nil, err
+	}
+
+	reg := asset.NewRegistry(testDB, nil)
+
+	txs := []*types.Tx{}
+	for i := 0; i < txNumber; i++ {
+		testAccountAlias := fmt.Sprintf("testAccount%d", i)
+		testAccount, err := accountManager.Create(nil, []chainkd.XPub{xpub.XPub}, 1, testAccountAlias)
+		if err != nil {
+			return nil, err
+		}
+
+		controlProg, err := accountManager.CreateAddress(nil, testAccount.ID, false)
+		if err != nil {
+			return nil, err
+		}
+
+		utxo := MockSimpleUtxo(0, consensus.BTMAssetID, 1000000000, controlProg)
+		testAssetAlias := fmt.Sprintf("testAsset%d", i)
+		testAsset, err := reg.Define([]chainkd.XPub{xpub.XPub}, 1, nil, testAssetAlias)
+		if err != nil {
+			return nil, err
+		}
+
+		issueAsset := MockIssueAsset{
+			Asset : testAsset,
+			IssueAmount :10000,
+			ControlProgram :controlProg.ControlProgram,
+		}
+
+		tpl, err := BuildTx(utxo, nil, testAccount.Signer, &issueAsset)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err := MockSign(tpl, hsm, "password"); err != nil {
 			return nil, err
 		}
 
