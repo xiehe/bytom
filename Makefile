@@ -106,7 +106,7 @@ target/$(MINER_BINARY64):
 
 test:
 	@echo "====> Running go test"
-	@go test -tags "network" $(PACKAGES)
+	@go test $(PACKAGES)
 
 benchmark:
 	go test -bench $(PACKAGES)
