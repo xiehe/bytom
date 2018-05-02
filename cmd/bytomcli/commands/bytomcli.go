@@ -117,6 +117,7 @@ func AddCommands() {
 	BytomcliCmd.AddCommand(createAccountReceiverCmd)
 	BytomcliCmd.AddCommand(listAddressesCmd)
 	BytomcliCmd.AddCommand(validateAddressCmd)
+	BytomcliCmd.AddCommand(rescanWalletBlocksCmd)
 
 	BytomcliCmd.AddCommand(createAssetCmd)
 	BytomcliCmd.AddCommand(getAssetCmd)
@@ -173,6 +174,7 @@ func AddTemplateFunc() {
 		createAccountReceiverCmd.Name(),
 		listAddressesCmd.Name(),
 		validateAddressCmd.Name(),
+		rescanWalletBlocksCmd.Name(),
 
 		createAssetCmd.Name(),
 		getAssetCmd.Name(),
