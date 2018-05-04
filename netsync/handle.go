@@ -14,6 +14,8 @@ import (
 	core "github.com/bytom/protocol"
 	"github.com/bytom/protocol/bc"
 	"github.com/bytom/version"
+	"net"
+	"time"
 )
 
 //SyncManager Sync Manager is responsible for the business layer information synchronization
@@ -28,6 +30,7 @@ type SyncManager struct {
 	fetcher     *Fetcher
 	blockKeeper *blockKeeper
 	peers       *peerSet
+	mapResult   bool
 
 	newBlockCh    chan *bc.Hash
 	newPeerCh     chan struct{}
@@ -65,11 +68,11 @@ func NewSyncManager(config *cfg.Config, chain *core.Chain, txPool *core.TxPool, 
 
 	// Create & add listener
 	p, address := protocolAndAddress(manager.config.P2P.ListenAddress)
-	l := p2p.NewDefaultListener(p, address, manager.config.P2P.SkipUPNP, nil)
+	l, mapResult := p2p.NewDefaultListener(p, address, manager.config.P2P.SkipUPNP, nil)
 	manager.sw.AddListener(l)
-	manager.sw.SetNodeInfo(manager.makeNodeInfo())
+	manager.sw.SetNodeInfo(manager.makeNodeInfo(mapResult))
 	manager.sw.SetNodePrivKey(manager.privKey)
-
+	manager.mapResult = mapResult
 	// Optionally, start the pex reactor
 	//var addrBook *p2p.AddrBook
 	if config.P2P.PexReactor {
@@ -91,7 +94,7 @@ func protocolAndAddress(listenAddr string) (string, string) {
 	return p, address
 }
 
-func (sm *SyncManager) makeNodeInfo() *p2p.NodeInfo {
+func (sm *SyncManager) makeNodeInfo(listenOpen bool) *p2p.NodeInfo {
 	nodeInfo := &p2p.NodeInfo{
 		PubKey:  sm.privKey.PubKey().Unwrap().(crypto.PubKeyEd25519),
 		Moniker: sm.config.Moniker,
@@ -108,13 +111,17 @@ func (sm *SyncManager) makeNodeInfo() *p2p.NodeInfo {
 	}
 
 	p2pListener := sm.sw.Listeners()[0]
-	p2pHost := p2pListener.ExternalAddress().IP.String()
-	p2pPort := p2pListener.ExternalAddress().Port
+	//p2pHost :=
+	//p2pPort :=
 
 	// We assume that the rpcListener has the same ExternalAddress.
 	// This is probably true because both P2P and RPC listeners use UPnP,
 	// except of course if the rpc is only bound to localhost
-	nodeInfo.ListenAddr = cmn.Fmt("%v:%v", p2pHost, p2pPort)
+	if listenOpen {
+		nodeInfo.ListenAddr = cmn.Fmt("%v:%v", p2pListener.ExternalAddress().IP.String(), p2pListener.ExternalAddress().Port)
+	} else {
+		nodeInfo.ListenAddr = cmn.Fmt("%v:%v", p2pListener.InternalAddress().IP.String(), p2pListener.InternalAddress().Port)
+	}
 	return nodeInfo
 }
 
@@ -123,6 +130,20 @@ func (sm *SyncManager) netStart() error {
 	_, err := sm.sw.Start()
 	if err != nil {
 		return err
+	}
+	//sm.sw.NodeInfo()
+	if !sm.mapResult {
+		conn, err := net.DialTimeout("tcp", sm.NodeInfo().ListenAddr, 3*time.Second)
+
+		if err != nil && conn == nil {
+			log.Info("Could not open listen port")
+		}
+
+		if err == nil && conn != nil {
+			log.Info("Success open listen port")
+			conn.Close()
+			sm.sw.SetNodeInfo(sm.makeNodeInfo(true))
+		}
 	}
 
 	// If seeds exist, add them to the address book and dial out
